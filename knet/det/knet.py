@@ -6,6 +6,7 @@ from mmdet.models.detectors import TwoStageDetector
 from mmdet.utils import get_root_logger
 from .utils import sem2ins_masks
 
+import pdb
 
 @DETECTORS.register_module()
 class KNet(TwoStageDetector):

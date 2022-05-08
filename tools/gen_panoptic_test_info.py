@@ -1,6 +1,6 @@
 import mmcv
 
-data_root = 'data/coco/annotations'
+data_root = 'datasets/annotations'
 
 val_info = mmcv.load(f'{data_root}/panoptic_val2017.json')
 test_old_info = mmcv.load(f'{data_root}/image_info_test-dev2017.json')

@@ -7,7 +7,7 @@ from mmdet.datasets.coco_panoptic import INSTANCE_OFFSET
 from mmdet.models.builder import HEADS, build_head
 from mmdet.models.roi_heads import BaseRoIHead
 from .mask_pseudo_sampler import MaskPseudoSampler
-
+import pdb
 
 @HEADS.register_module()
 class KernelIterHead(BaseRoIHead):
@@ -111,7 +111,7 @@ class KernelIterHead(BaseRoIHead):
         assert len(mask_head) == self.num_stages
         for head in mask_head:
             self.mask_head.append(build_head(head))
-        if self.recursive:
+        if self.recursive: # False
             for i in range(self.num_stages):
                 self.mask_head[i] = self.mask_head[0]
 
@@ -165,10 +165,10 @@ class KernelIterHead(BaseRoIHead):
         else:
             prev_cls_score = [None] * num_imgs
 
-        if self.hard_target:
-            gt_masks = [x.bool().float() for x in gt_masks]
-        else:
-            gt_masks = gt_masks
+        # if self.hard_target: # False
+        #     gt_masks = [x.bool().float() for x in gt_masks]
+        # else:
+        #     gt_masks = gt_masks
 
         object_feats = proposal_feats
         all_stage_loss = {}
@@ -183,7 +183,7 @@ class KernelIterHead(BaseRoIHead):
             cls_score = mask_results['cls_score']
             object_feats = mask_results['object_feats']
 
-            if self.post_assign:
+            if self.post_assign: # False
                 prev_mask_preds = scaled_mask_preds.detach()
                 prev_cls_score = cls_score.detach()
 
@@ -224,7 +224,7 @@ class KernelIterHead(BaseRoIHead):
                 all_stage_loss[f's{stage}_{key}'] = value * \
                                     self.stage_loss_weights[stage]
 
-            if not self.post_assign:
+            if not self.post_assign: # True
                 prev_mask_preds = scaled_mask_preds.detach()
                 prev_cls_score = cls_score.detach()
 
@@ -237,14 +237,21 @@ class KernelIterHead(BaseRoIHead):
                     cls_score,
                     img_metas,
                     imgs_whwh=None,
-                    rescale=False):
+                    rescale=True):
 
         # Decode initial proposals
-        num_imgs = len(img_metas)
+        # img_metas -- [{'filename': 'images/001.png', 
+        # 'ori_filename': 'images/001.png', 'ori_shape': (960, 1280, 3), 
+        # 'img_shape': (800, 1067, 3), 'pad_shape': (800, 1088, 3), 
+        # 'scale_factor': array([0.8335937, 0.8333333, 0.8335937, 0.8333333], dtype=float32), 'flip': False, 'flip_direction': None, 'img_norm_cfg': {'mean': array([123.675, 116.28 , 103.53 ], dtype=float32), 'std': array([58.395, 57.12 , 57.375], dtype=float32), 'to_rgb': True}, 
+        # 'batch_input_shape': (800, 1088)}]
+
+        num_imgs = len(img_metas) # ==> 1
+
         # num_proposals = proposal_feats.size(1)
 
         object_feats = proposal_feats
-        for stage in range(self.num_stages):
+        for stage in range(self.num_stages): # self.num_stages -- 3
             mask_results = self._mask_forward(stage, x, object_feats,
                                               mask_preds, img_metas)
             object_feats = mask_results['object_feats']
@@ -260,8 +267,17 @@ class KernelIterHead(BaseRoIHead):
         else:
             cls_score = cls_score.softmax(-1)[..., :-1]
 
-        if self.do_panoptic:
+        if self.do_panoptic: # True
             for img_id in range(num_imgs):
+                #  cls_score[0].size(), cls_score[0].min(), cls_score[0].max()
+                # ([153, 133], 2.000453787331935e-05, 0.8948379158973694)
+                # scaled_mask_preds[0].size() -- [153, 200, 272]
+                # self.test_cfg
+                # {'max_per_img': 100, 'mask_thr': 0.5, 
+                #     'stuff_score_thr': 0.05, 'merge_stuff_thing': {
+                #     'overlap_thr': 0.6, 'iou_thr': 0.5, 'stuff_max_area': 4096, 'instance_score_thr': 0.3}
+                # }
+
                 single_result = self.get_panoptic(cls_score[img_id],
                                                   scaled_mask_preds[img_id],
                                                   self.test_cfg,
@@ -303,7 +319,9 @@ class KernelIterHead(BaseRoIHead):
     def get_panoptic(self, cls_scores, mask_preds, test_cfg, img_meta):
         # resize mask predictions back
         scores = cls_scores[:self.num_proposals][:, :self.num_thing_classes]
+        # scores.size() -- [100, 80]
         thing_scores, thing_labels = scores.max(dim=1)
+
         stuff_scores = cls_scores[
             self.num_proposals:][:, self.num_thing_classes:].diag()
         stuff_labels = torch.arange(
@@ -314,6 +332,10 @@ class KernelIterHead(BaseRoIHead):
         total_scores = torch.cat([thing_scores, stuff_scores], dim=0)
         total_labels = torch.cat([thing_labels, stuff_labels], dim=0)
 
+        # total_masks.size() -- [153, 960, 1280]
+        # total_labels.size() -- [153]
+        # total_labels -- [ 29,  19,  58,  28,  29, ... , 131, 132]
+        # total_scores.size() -- [153]
         panoptic_result = self.merge_stuff_thing(total_masks, total_labels,
                                                  total_scores,
                                                  test_cfg.merge_stuff_thing)
@@ -327,7 +349,7 @@ class KernelIterHead(BaseRoIHead):
 
         H, W = total_masks.shape[-2:]
         panoptic_seg = total_masks.new_full((H, W),
-                                            self.num_classes,
+                                            self.num_classes, # 133
                                             dtype=torch.long)
 
         cur_prob_masks = total_scores.view(-1, 1, 1) * total_masks
@@ -350,7 +372,7 @@ class KernelIterHead(BaseRoIHead):
             if mask_area > 0 and original_area > 0:
                 if mask_area / original_area < merge_cfg.overlap_thr:
                     continue
-
+                # INSTANCE_OFFSET -- 1000
                 panoptic_seg[mask] = total_labels[k] \
                     + current_segment_id * INSTANCE_OFFSET
                 current_segment_id += 1
