@@ -3,6 +3,7 @@ import torch
 from mmdet.core.bbox import BaseSampler, SamplingResult
 from mmdet.core.bbox.builder import BBOX_SAMPLERS
 
+import pdb
 
 class MaskSamplingResult(SamplingResult):
     """Bbox sampling result.
@@ -45,6 +46,8 @@ class MaskSamplingResult(SamplingResult):
             self.pos_gt_labels = assign_result.labels[pos_inds]
         else:
             self.pos_gt_labels = None
+
+        pdb.set_trace()
 
     @property
     def masks(self):

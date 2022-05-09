@@ -6,7 +6,7 @@ from mmcv.cnn import (ConvModule, bias_init_with_prob, build_activation_layer,
                       build_norm_layer)
 from mmcv.cnn.bricks.transformer import (FFN, MultiheadAttention,
                                          build_transformer_layer)
-from mmcv.runner import force_fp32
+# from mmcv.runner import force_fp32
 
 from mmdet.core import multi_apply
 from mmdet.models.builder import HEADS, build_loss
@@ -14,16 +14,16 @@ from mmdet.models.dense_heads.atss_head import reduce_mean
 from mmdet.models.losses import accuracy
 from mmdet.utils import get_root_logger
 
+import pdb
 
 @HEADS.register_module()
 class KernelUpdateHead(nn.Module):
-
     def __init__(self,
-                 num_classes=80,
+                 num_classes=133,
                  num_ffn_fcs=2,
                  num_heads=8,
                  num_cls_fcs=1,
-                 num_mask_fcs=3,
+                 num_mask_fcs=1,
                  feedforward_channels=2048,
                  in_channels=256,
                  out_channels=256,
@@ -31,8 +31,8 @@ class KernelUpdateHead(nn.Module):
                  mask_thr=0.5,
                  act_cfg=dict(type='ReLU', inplace=True),
                  ffn_act_cfg=dict(type='ReLU', inplace=True),
-                 conv_kernel_size=3,
-                 feat_transform_cfg=None,
+                 conv_kernel_size=1,
+                 feat_transform_cfg={'conv_cfg': {'type': 'Conv2d'}, 'act_cfg': None},
                  hard_mask_thr=0.5,
                  kernel_init=False,
                  with_ffn=True,
@@ -41,37 +41,30 @@ class KernelUpdateHead(nn.Module):
                  relative_coors_off=False,
                  feat_gather_stride=1,
                  mask_transform_stride=1,
-                 mask_upsample_stride=1,
+                 mask_upsample_stride=2,
                  num_thing_classes=80,
                  num_stuff_classes=53,
                  mask_assign_stride=4,
                  ignore_label=255,
                  thing_label_in_seg=0,
-                 kernel_updator_cfg=dict(
-                     type='DynamicConv',
-                     in_channels=256,
-                     feat_channels=64,
-                     out_channels=256,
-                     input_feat_shape=1,
-                     act_cfg=dict(type='ReLU', inplace=True),
-                     norm_cfg=dict(type='LN')),
-                 loss_rank=None,
-                 loss_mask=dict(
-                     type='CrossEntropyLoss', use_mask=True, loss_weight=1.0),
-                 loss_dice=dict(type='DiceLoss', loss_weight=3.0),
-                 loss_cls=dict(
-                     type='FocalLoss',
-                     use_sigmoid=True,
-                     gamma=2.0,
-                     alpha=0.25,
-                     loss_weight=2.0)):
+                 kernel_updator_cfg={'type': 'KernelUpdator', 'in_channels': 256, 'feat_channels': 256, 'out_channels': 256, 'input_feat_shape': 3, 'act_cfg': {'type': 'ReLU', 'inplace': True}, 'norm_cfg': {'type': 'LN'}},
+                 loss_rank={'type': 'CrossEntropyLoss', 'use_sigmoid': False, 'loss_weight': 0.1},
+                 loss_mask={'type': 'CrossEntropyLoss', 'use_sigmoid': True, 'loss_weight': 1.0},
+                 loss_dice={'type': 'DiceLoss', 'loss_weight': 4.0},
+                 loss_cls={'type': 'FocalLoss', 'use_sigmoid': True, 'gamma': 2.0, 'alpha': 0.25, 'loss_weight': 2.0}):
         super(KernelUpdateHead, self).__init__()
+
         self.num_classes = num_classes
+        # xxxx8888
         self.loss_cls = build_loss(loss_cls)
+
+        # xxxx8888
         self.loss_mask = build_loss(loss_mask)
+
+        # xxxx8888
         self.loss_dice = build_loss(loss_dice)
-        if loss_rank is not None:
-            self.loss_rank = build_loss(loss_rank)
+        if loss_rank is not None: # True
+            self.loss_rank = build_loss(loss_rank) # xxxx8888
         else:
             self.loss_rank = loss_rank
 
@@ -99,6 +92,7 @@ class KernelUpdateHead(nn.Module):
         self.ignore_label = ignore_label
         self.thing_label_in_seg = thing_label_in_seg
 
+        # xxxx8888
         self.attention = MultiheadAttention(in_channels * conv_kernel_size**2,
                                             num_heads, dropout)
         self.attention_norm = build_norm_layer(
@@ -106,8 +100,10 @@ class KernelUpdateHead(nn.Module):
 
         self.kernel_update_conv = build_transformer_layer(kernel_updator_cfg)
 
-        if feat_transform_cfg is not None:
-            kernel_size = feat_transform_cfg.pop('kernel_size', 1)
+        # feat_transform_cfg -- {'conv_cfg': {'type': 'Conv2d'}, 'act_cfg': None}
+        if feat_transform_cfg is not None: # True
+            kernel_size = feat_transform_cfg.pop('kernel_size', 1) # 1
+            # xxxx8888 ConvModule
             self.feat_transform = ConvModule(
                 in_channels,
                 in_channels,
@@ -115,10 +111,14 @@ class KernelUpdateHead(nn.Module):
                 stride=feat_gather_stride,
                 padding=int(feat_gather_stride // 2),
                 **feat_transform_cfg)
+            #self.feat_transform -- ConvModule(
+            #     (conv): Conv2d(256, 256, kernel_size=(1, 1), stride=(1, 1))
+            # )
         else:
             self.feat_transform = None
 
-        if self.with_ffn:
+        if self.with_ffn: # True
+            # xxxx8888
             self.ffn = FFN(
                 in_channels,
                 feedforward_channels,
@@ -128,20 +128,20 @@ class KernelUpdateHead(nn.Module):
             self.ffn_norm = build_norm_layer(dict(type='LN'), in_channels)[1]
 
         self.cls_fcs = nn.ModuleList()
-        for _ in range(num_cls_fcs):
+        for _ in range(num_cls_fcs): #  num_cls_fcs -- 1
             self.cls_fcs.append(
                 nn.Linear(in_channels, in_channels, bias=False))
             self.cls_fcs.append(
                 build_norm_layer(dict(type='LN'), in_channels)[1])
             self.cls_fcs.append(build_activation_layer(act_cfg))
 
-        if self.loss_cls.use_sigmoid:
+        if self.loss_cls.use_sigmoid: # True
             self.fc_cls = nn.Linear(in_channels, self.num_classes)
         else:
             self.fc_cls = nn.Linear(in_channels, self.num_classes + 1)
 
         self.mask_fcs = nn.ModuleList()
-        for _ in range(num_mask_fcs):
+        for _ in range(num_mask_fcs): # num_mask_fcs -- 1
             self.mask_fcs.append(
                 nn.Linear(in_channels, in_channels, bias=False))
             self.mask_fcs.append(
@@ -275,169 +275,169 @@ class KernelUpdateHead(nn.Module):
             N, num_proposals, self.in_channels, self.conv_kernel_size,
             self.conv_kernel_size)
 
-    @force_fp32(apply_to=('cls_score', 'mask_pred'))
-    def loss(self,
-             object_feats,
-             cls_score,
-             mask_pred,
-             labels,
-             label_weights,
-             mask_targets,
-             mask_weights,
-             imgs_whwh=None,
-             reduction_override=None,
-             **kwargs):
+    # # @force_fp32(apply_to=('cls_score', 'mask_pred'))
+    # def loss(self,
+    #          object_feats,
+    #          cls_score,
+    #          mask_pred,
+    #          labels,
+    #          label_weights,
+    #          mask_targets,
+    #          mask_weights,
+    #          imgs_whwh=None,
+    #          reduction_override=None,
+    #          **kwargs):
 
-        losses = dict()
-        bg_class_ind = self.num_classes
-        # note in spare rcnn num_gt == num_pos
-        pos_inds = (labels >= 0) & (labels < bg_class_ind)
-        num_pos = pos_inds.sum().float()
-        avg_factor = reduce_mean(num_pos).clamp_(min=1.0)
+    #     losses = dict()
+    #     bg_class_ind = self.num_classes
+    #     # note in spare rcnn num_gt == num_pos
+    #     pos_inds = (labels >= 0) & (labels < bg_class_ind)
+    #     num_pos = pos_inds.sum().float()
+    #     avg_factor = reduce_mean(num_pos).clamp_(min=1.0)
 
-        num_preds = mask_pred.shape[0] * mask_pred.shape[1]
-        assert mask_pred.shape[0] == cls_score.shape[0]
-        assert mask_pred.shape[1] == cls_score.shape[1]
+    #     num_preds = mask_pred.shape[0] * mask_pred.shape[1]
+    #     assert mask_pred.shape[0] == cls_score.shape[0]
+    #     assert mask_pred.shape[1] == cls_score.shape[1]
 
-        if cls_score is not None:
-            if cls_score.numel() > 0:
-                losses['loss_cls'] = self.loss_cls(
-                    cls_score.view(num_preds, -1),
-                    labels,
-                    label_weights,
-                    avg_factor=avg_factor,
-                    reduction_override=reduction_override)
-                losses['pos_acc'] = accuracy(
-                    cls_score.view(num_preds, -1)[pos_inds], labels[pos_inds])
-        if mask_pred is not None:
-            bool_pos_inds = pos_inds.type(torch.bool)
-            # 0~self.num_classes-1 are FG, self.num_classes is BG
-            # do not perform bounding box regression for BG anymore.
-            H, W = mask_pred.shape[-2:]
-            if pos_inds.any():
-                pos_mask_pred = mask_pred.reshape(num_preds, H,
-                                                  W)[bool_pos_inds]
-                pos_mask_targets = mask_targets[bool_pos_inds]
-                losses['loss_mask'] = self.loss_mask(pos_mask_pred,
-                                                     pos_mask_targets)
-                losses['loss_dice'] = self.loss_dice(pos_mask_pred,
-                                                     pos_mask_targets)
+    #     if cls_score is not None:
+    #         if cls_score.numel() > 0:
+    #             losses['loss_cls'] = self.loss_cls(
+    #                 cls_score.view(num_preds, -1),
+    #                 labels,
+    #                 label_weights,
+    #                 avg_factor=avg_factor,
+    #                 reduction_override=reduction_override)
+    #             losses['pos_acc'] = accuracy(
+    #                 cls_score.view(num_preds, -1)[pos_inds], labels[pos_inds])
+    #     if mask_pred is not None:
+    #         bool_pos_inds = pos_inds.type(torch.bool)
+    #         # 0~self.num_classes-1 are FG, self.num_classes is BG
+    #         # do not perform bounding box regression for BG anymore.
+    #         H, W = mask_pred.shape[-2:]
+    #         if pos_inds.any():
+    #             pos_mask_pred = mask_pred.reshape(num_preds, H,
+    #                                               W)[bool_pos_inds]
+    #             pos_mask_targets = mask_targets[bool_pos_inds]
+    #             losses['loss_mask'] = self.loss_mask(pos_mask_pred,
+    #                                                  pos_mask_targets)
+    #             losses['loss_dice'] = self.loss_dice(pos_mask_pred,
+    #                                                  pos_mask_targets)
 
-                if self.loss_rank is not None:
-                    batch_size = mask_pred.size(0)
-                    rank_target = mask_targets.new_full((batch_size, H, W),
-                                                        self.ignore_label,
-                                                        dtype=torch.long)
-                    rank_inds = pos_inds.view(batch_size,
-                                              -1).nonzero(as_tuple=False)
-                    batch_mask_targets = mask_targets.view(
-                        batch_size, -1, H, W).bool()
-                    for i in range(batch_size):
-                        curr_inds = (rank_inds[:, 0] == i)
-                        curr_rank = rank_inds[:, 1][curr_inds]
-                        for j in curr_rank:
-                            rank_target[i][batch_mask_targets[i][j]] = j
-                    losses['loss_rank'] = self.loss_rank(
-                        mask_pred, rank_target, ignore_index=self.ignore_label)
-            else:
-                losses['loss_mask'] = mask_pred.sum() * 0
-                losses['loss_dice'] = mask_pred.sum() * 0
-                if self.loss_rank is not None:
-                    losses['loss_rank'] = mask_pred.sum() * 0
+    #             if self.loss_rank is not None:
+    #                 batch_size = mask_pred.size(0)
+    #                 rank_target = mask_targets.new_full((batch_size, H, W),
+    #                                                     self.ignore_label,
+    #                                                     dtype=torch.long)
+    #                 rank_inds = pos_inds.view(batch_size,
+    #                                           -1).nonzero(as_tuple=False)
+    #                 batch_mask_targets = mask_targets.view(
+    #                     batch_size, -1, H, W).bool()
+    #                 for i in range(batch_size):
+    #                     curr_inds = (rank_inds[:, 0] == i)
+    #                     curr_rank = rank_inds[:, 1][curr_inds]
+    #                     for j in curr_rank:
+    #                         rank_target[i][batch_mask_targets[i][j]] = j
+    #                 losses['loss_rank'] = self.loss_rank(
+    #                     mask_pred, rank_target, ignore_index=self.ignore_label)
+    #         else:
+    #             losses['loss_mask'] = mask_pred.sum() * 0
+    #             losses['loss_dice'] = mask_pred.sum() * 0
+    #             if self.loss_rank is not None:
+    #                 losses['loss_rank'] = mask_pred.sum() * 0
 
-        return losses
+    #     return losses
 
-    def _get_target_single(self, pos_inds, neg_inds, pos_mask, neg_mask,
-                           pos_gt_mask, pos_gt_labels, gt_sem_seg, gt_sem_cls,
-                           cfg):
+    # def _get_target_single(self, pos_inds, neg_inds, pos_mask, neg_mask,
+    #                        pos_gt_mask, pos_gt_labels, gt_sem_seg, gt_sem_cls,
+    #                        cfg):
 
-        num_pos = pos_mask.size(0)
-        num_neg = neg_mask.size(0)
-        num_samples = num_pos + num_neg
-        H, W = pos_mask.shape[-2:]
-        # original implementation uses new_zeros since BG are set to be 0
-        # now use empty & fill because BG cat_id = num_classes,
-        # FG cat_id = [0, num_classes-1]
-        labels = pos_mask.new_full((num_samples, ),
-                                   self.num_classes,
-                                   dtype=torch.long)
-        label_weights = pos_mask.new_zeros((num_samples, self.num_classes))
-        mask_targets = pos_mask.new_zeros(num_samples, H, W)
-        mask_weights = pos_mask.new_zeros(num_samples, H, W)
-        if num_pos > 0:
-            labels[pos_inds] = pos_gt_labels
-            pos_weight = 1.0 if cfg.pos_weight <= 0 else cfg.pos_weight
-            label_weights[pos_inds] = pos_weight
-            pos_mask_targets = pos_gt_mask
-            mask_targets[pos_inds, ...] = pos_mask_targets
-            mask_weights[pos_inds, ...] = 1
+    #     num_pos = pos_mask.size(0)
+    #     num_neg = neg_mask.size(0)
+    #     num_samples = num_pos + num_neg
+    #     H, W = pos_mask.shape[-2:]
+    #     # original implementation uses new_zeros since BG are set to be 0
+    #     # now use empty & fill because BG cat_id = num_classes,
+    #     # FG cat_id = [0, num_classes-1]
+    #     labels = pos_mask.new_full((num_samples, ),
+    #                                self.num_classes,
+    #                                dtype=torch.long)
+    #     label_weights = pos_mask.new_zeros((num_samples, self.num_classes))
+    #     mask_targets = pos_mask.new_zeros(num_samples, H, W)
+    #     mask_weights = pos_mask.new_zeros(num_samples, H, W)
+    #     if num_pos > 0:
+    #         labels[pos_inds] = pos_gt_labels
+    #         pos_weight = 1.0 if cfg.pos_weight <= 0 else cfg.pos_weight
+    #         label_weights[pos_inds] = pos_weight
+    #         pos_mask_targets = pos_gt_mask
+    #         mask_targets[pos_inds, ...] = pos_mask_targets
+    #         mask_weights[pos_inds, ...] = 1
 
-        if num_neg > 0:
-            label_weights[neg_inds] = 1.0
+    #     if num_neg > 0:
+    #         label_weights[neg_inds] = 1.0
 
-        if gt_sem_cls is not None and gt_sem_seg is not None:
-            sem_labels = pos_mask.new_full((self.num_stuff_classes, ),
-                                           self.num_classes,
-                                           dtype=torch.long)
-            sem_targets = pos_mask.new_zeros(self.num_stuff_classes, H, W)
-            sem_weights = pos_mask.new_zeros(self.num_stuff_classes, H, W)
-            sem_stuff_weights = torch.eye(
-                self.num_stuff_classes, device=pos_mask.device)
-            sem_thing_weights = pos_mask.new_zeros(
-                (self.num_stuff_classes, self.num_thing_classes))
-            sem_label_weights = torch.cat(
-                [sem_thing_weights, sem_stuff_weights], dim=-1)
-            if len(gt_sem_cls > 0):
-                sem_inds = gt_sem_cls - self.num_thing_classes
-                sem_inds = sem_inds.long()
-                sem_labels[sem_inds] = gt_sem_cls.long()
-                sem_targets[sem_inds] = gt_sem_seg
-                sem_weights[sem_inds] = 1
+    #     if gt_sem_cls is not None and gt_sem_seg is not None:
+    #         sem_labels = pos_mask.new_full((self.num_stuff_classes, ),
+    #                                        self.num_classes,
+    #                                        dtype=torch.long)
+    #         sem_targets = pos_mask.new_zeros(self.num_stuff_classes, H, W)
+    #         sem_weights = pos_mask.new_zeros(self.num_stuff_classes, H, W)
+    #         sem_stuff_weights = torch.eye(
+    #             self.num_stuff_classes, device=pos_mask.device)
+    #         sem_thing_weights = pos_mask.new_zeros(
+    #             (self.num_stuff_classes, self.num_thing_classes))
+    #         sem_label_weights = torch.cat(
+    #             [sem_thing_weights, sem_stuff_weights], dim=-1)
+    #         if len(gt_sem_cls > 0):
+    #             sem_inds = gt_sem_cls - self.num_thing_classes
+    #             sem_inds = sem_inds.long()
+    #             sem_labels[sem_inds] = gt_sem_cls.long()
+    #             sem_targets[sem_inds] = gt_sem_seg
+    #             sem_weights[sem_inds] = 1
 
-            label_weights[:, self.num_thing_classes:] = 0
-            labels = torch.cat([labels, sem_labels])
-            label_weights = torch.cat([label_weights, sem_label_weights])
-            mask_targets = torch.cat([mask_targets, sem_targets])
-            mask_weights = torch.cat([mask_weights, sem_weights])
+    #         label_weights[:, self.num_thing_classes:] = 0
+    #         labels = torch.cat([labels, sem_labels])
+    #         label_weights = torch.cat([label_weights, sem_label_weights])
+    #         mask_targets = torch.cat([mask_targets, sem_targets])
+    #         mask_weights = torch.cat([mask_weights, sem_weights])
 
-        return labels, label_weights, mask_targets, mask_weights
+    #     return labels, label_weights, mask_targets, mask_weights
 
-    def get_targets(self,
-                    sampling_results,
-                    gt_mask,
-                    gt_labels,
-                    rcnn_train_cfg,
-                    concat=True,
-                    gt_sem_seg=None,
-                    gt_sem_cls=None):
+    # def get_targets(self,
+    #                 sampling_results,
+    #                 gt_mask,
+    #                 gt_labels,
+    #                 rcnn_train_cfg,
+    #                 concat=True,
+    #                 gt_sem_seg=None,
+    #                 gt_sem_cls=None):
 
-        pos_inds_list = [res.pos_inds for res in sampling_results]
-        neg_inds_list = [res.neg_inds for res in sampling_results]
-        pos_mask_list = [res.pos_masks for res in sampling_results]
-        neg_mask_list = [res.neg_masks for res in sampling_results]
-        pos_gt_mask_list = [res.pos_gt_masks for res in sampling_results]
-        pos_gt_labels_list = [res.pos_gt_labels for res in sampling_results]
-        if gt_sem_seg is None:
-            gt_sem_seg = [None] * 2
-            gt_sem_cls = [None] * 2
+    #     pos_inds_list = [res.pos_inds for res in sampling_results]
+    #     neg_inds_list = [res.neg_inds for res in sampling_results]
+    #     pos_mask_list = [res.pos_masks for res in sampling_results]
+    #     neg_mask_list = [res.neg_masks for res in sampling_results]
+    #     pos_gt_mask_list = [res.pos_gt_masks for res in sampling_results]
+    #     pos_gt_labels_list = [res.pos_gt_labels for res in sampling_results]
+    #     if gt_sem_seg is None:
+    #         gt_sem_seg = [None] * 2
+    #         gt_sem_cls = [None] * 2
 
-        labels, label_weights, mask_targets, mask_weights = multi_apply(
-            self._get_target_single,
-            pos_inds_list,
-            neg_inds_list,
-            pos_mask_list,
-            neg_mask_list,
-            pos_gt_mask_list,
-            pos_gt_labels_list,
-            gt_sem_seg,
-            gt_sem_cls,
-            cfg=rcnn_train_cfg)
-        if concat:
-            labels = torch.cat(labels, 0)
-            label_weights = torch.cat(label_weights, 0)
-            mask_targets = torch.cat(mask_targets, 0)
-            mask_weights = torch.cat(mask_weights, 0)
-        return labels, label_weights, mask_targets, mask_weights
+    #     labels, label_weights, mask_targets, mask_weights = multi_apply(
+    #         self._get_target_single,
+    #         pos_inds_list,
+    #         neg_inds_list,
+    #         pos_mask_list,
+    #         neg_mask_list,
+    #         pos_gt_mask_list,
+    #         pos_gt_labels_list,
+    #         gt_sem_seg,
+    #         gt_sem_cls,
+    #         cfg=rcnn_train_cfg)
+    #     if concat:
+    #         labels = torch.cat(labels, 0)
+    #         label_weights = torch.cat(label_weights, 0)
+    #         mask_targets = torch.cat(mask_targets, 0)
+    #         mask_weights = torch.cat(mask_weights, 0)
+    #     return labels, label_weights, mask_targets, mask_weights
 
     def rescale_masks(self, masks_per_img, img_meta):
         h, w, _ = img_meta['img_shape']
@@ -456,27 +456,27 @@ class KernelUpdateHead(nn.Module):
             align_corners=False).squeeze(0)
         return seg_masks
 
-    def get_seg_masks(self, masks_per_img, labels_per_img, scores_per_img,
-                      test_cfg, img_meta):
-        # resize mask predictions back
-        seg_masks = self.rescale_masks(masks_per_img, img_meta)
-        seg_masks = seg_masks > test_cfg.mask_thr
-        bbox_result, segm_result = self.segm2result(seg_masks, labels_per_img,
-                                                    scores_per_img)
-        return bbox_result, segm_result
+    # def get_seg_masks(self, masks_per_img, labels_per_img, scores_per_img,
+    #                   test_cfg, img_meta):
+    #     # resize mask predictions back
+    #     seg_masks = self.rescale_masks(masks_per_img, img_meta)
+    #     seg_masks = seg_masks > test_cfg.mask_thr
+    #     bbox_result, segm_result = self.segm2result(seg_masks, labels_per_img,
+    #                                                 scores_per_img)
+    #     return bbox_result, segm_result
 
-    def segm2result(self, mask_preds, det_labels, cls_scores):
-        num_classes = self.num_classes
-        bbox_result = None
-        segm_result = [[] for _ in range(num_classes)]
-        mask_preds = mask_preds.cpu().numpy()
-        det_labels = det_labels.cpu().numpy()
-        cls_scores = cls_scores.cpu().numpy()
-        num_ins = mask_preds.shape[0]
-        # fake bboxes
-        bboxes = np.zeros((num_ins, 5), dtype=np.float32)
-        bboxes[:, -1] = cls_scores
-        bbox_result = [bboxes[det_labels == i, :] for i in range(num_classes)]
-        for idx in range(num_ins):
-            segm_result[det_labels[idx]].append(mask_preds[idx])
-        return bbox_result, segm_result
+    # def segm2result(self, mask_preds, det_labels, cls_scores):
+    #     num_classes = self.num_classes
+    #     bbox_result = None
+    #     segm_result = [[] for _ in range(num_classes)]
+    #     mask_preds = mask_preds.cpu().numpy()
+    #     det_labels = det_labels.cpu().numpy()
+    #     cls_scores = cls_scores.cpu().numpy()
+    #     num_ins = mask_preds.shape[0]
+    #     # fake bboxes
+    #     bboxes = np.zeros((num_ins, 5), dtype=np.float32)
+    #     bboxes[:, -1] = cls_scores
+    #     bbox_result = [bboxes[det_labels == i, :] for i in range(num_classes)]
+    #     for idx in range(num_ins):
+    #         segm_result[det_labels[idx]].append(mask_preds[idx])
+    #     return bbox_result, segm_result

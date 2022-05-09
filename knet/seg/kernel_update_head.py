@@ -6,7 +6,7 @@ from mmcv.cnn.bricks.transformer import (FFN, MultiheadAttention,
                                          build_transformer_layer)
 from mmseg.models.builder import HEADS
 from mmseg.utils import get_root_logger
-
+import pdb
 
 @HEADS.register_module()
 class KernelUpdateHead(nn.Module):
@@ -62,6 +62,7 @@ class KernelUpdateHead(nn.Module):
         if feat_transform_cfg is not None:
             kernel_size = feat_transform_cfg.pop('kernel_size', 1)
             transform_channels = in_channels
+            # xxxx8888 ConvModule
             self.feat_transform = ConvModule(
                 transform_channels,
                 in_channels,
@@ -90,6 +91,7 @@ class KernelUpdateHead(nn.Module):
             self.mask_fcs.append(build_activation_layer(act_cfg))
 
         self.fc_mask = nn.Linear(in_channels, out_channels)
+        pdb.set_trace()
 
     def init_weights(self):
         """Use xavier initialization for all weight parameter and set

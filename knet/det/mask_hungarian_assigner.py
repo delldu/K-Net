@@ -5,6 +5,8 @@ from mmdet.core import AssignResult, BaseAssigner
 from mmdet.core.bbox.builder import BBOX_ASSIGNERS
 from mmdet.core.bbox.match_costs.builder import MATCH_COST, build_match_cost
 
+import pdb
+
 try:
     from scipy.optimize import linear_sum_assignment
 except ImportError:
@@ -40,6 +42,8 @@ class DiceCost(object):
         self.pred_act = pred_act
         self.act_mode = act_mode
         self.eps = eps
+
+        pdb.set_trace()
 
     def dice_loss(cls, input, target, eps=1e-3):
         input = input.reshape(input.size()[0], -1)

@@ -300,6 +300,8 @@ if __name__ == "__main__":
     device = "cuda:0"
 
     model = init_detector(config_file, checkpoint_file, device=device)
+    # config = mmcv.Config.fromfile(config_file)
+    # model = build_detector(config.model, test_cfg=config.get('test_cfg'))
     coco = COCO()
 
     img = "images/005.png"
@@ -312,5 +314,3 @@ if __name__ == "__main__":
 
     final_image = T.ToPILImage()(final_tensor)
     final_image.show()
-
-    pdb.set_trace()

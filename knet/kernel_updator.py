@@ -3,17 +3,17 @@ import torch.nn.functional as F
 from mmcv.cnn import build_activation_layer, build_norm_layer
 from mmcv.cnn.bricks.transformer import TRANSFORMER_LAYER
 
+import pdb
 
 @TRANSFORMER_LAYER.register_module()
 class KernelUpdator(nn.Module):
-
     def __init__(self,
                  in_channels=256,
-                 feat_channels=64,
-                 out_channels=None,
+                 feat_channels=256,
+                 out_channels=256,
                  input_feat_shape=3,
                  gate_sigmoid=True,
-                 gate_norm_act=False,
+                 # gate_norm_act=False,
                  activate_out=False,
                  act_cfg=dict(type='ReLU', inplace=True),
                  norm_cfg=dict(type='LN')):
@@ -22,7 +22,7 @@ class KernelUpdator(nn.Module):
         self.feat_channels = feat_channels
         self.out_channels_raw = out_channels
         self.gate_sigmoid = gate_sigmoid
-        self.gate_norm_act = gate_norm_act
+        # self.gate_norm_act = gate_norm_act
         self.activate_out = activate_out
         if isinstance(input_feat_shape, int):
             input_feat_shape = [input_feat_shape] * 2
@@ -40,8 +40,8 @@ class KernelUpdator(nn.Module):
                                      1)
         self.input_gate = nn.Linear(self.in_channels, self.feat_channels, 1)
         self.update_gate = nn.Linear(self.in_channels, self.feat_channels, 1)
-        if self.gate_norm_act:
-            self.gate_norm = build_norm_layer(norm_cfg, self.feat_channels)[1]
+        # if self.gate_norm_act: # False
+        #     self.gate_norm = build_norm_layer(norm_cfg, self.feat_channels)[1]
 
         self.norm_in = build_norm_layer(norm_cfg, self.feat_channels)[1]
         self.norm_out = build_norm_layer(norm_cfg, self.feat_channels)[1]
@@ -68,8 +68,8 @@ class KernelUpdator(nn.Module):
         input_out = input_feats[..., -self.num_params_out:]
 
         gate_feats = input_in * param_in.unsqueeze(-2)
-        if self.gate_norm_act:
-            gate_feats = self.activation(self.gate_norm(gate_feats))
+        # if self.gate_norm_act:
+        #     gate_feats = self.activation(self.gate_norm(gate_feats))
 
         input_gate = self.input_norm_in(self.input_gate(gate_feats))
         update_gate = self.norm_in(self.update_gate(gate_feats))

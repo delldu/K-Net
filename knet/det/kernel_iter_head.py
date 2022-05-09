@@ -9,17 +9,28 @@ from mmdet.models.roi_heads import BaseRoIHead
 from .mask_pseudo_sampler import MaskPseudoSampler
 import pdb
 
+
+# def __init__(self,
+#              bbox_roi_extractor=None,
+#              bbox_head=None,
+#              mask_roi_extractor=None,
+#              mask_head=None,
+#              shared_head=None,
+#              train_cfg=None,
+#              test_cfg=None,
+#              pretrained=None,
+#              init_cfg=None):
+
 @HEADS.register_module()
 class KernelIterHead(BaseRoIHead):
-
     def __init__(self,
-                 num_stages=6,
+                 num_stages=3,
                  recursive=False,
                  assign_stages=5,
-                 stage_loss_weights=(1, 1, 1, 1, 1, 1),
+                 stage_loss_weights=[1, 1, ],
                  proposal_feature_channel=256,
                  merge_cls_scores=False,
-                 do_panoptic=False,
+                 do_panoptic=True,
                  post_assign=False,
                  hard_target=False,
                  num_proposals=100,
@@ -27,24 +38,38 @@ class KernelIterHead(BaseRoIHead):
                  num_stuff_classes=53,
                  mask_assign_stride=4,
                  thing_label_in_seg=0,
-                 mask_head=dict(
-                     type='KernelUpdateHead',
-                     num_classes=80,
-                     num_fcs=2,
-                     num_heads=8,
-                     num_cls_fcs=1,
-                     num_reg_fcs=3,
-                     feedforward_channels=2048,
-                     hidden_channels=256,
-                     dropout=0.0,
-                     roi_feat_size=7,
-                     ffn_act_cfg=dict(type='ReLU', inplace=True)),
+                 mask_head=[{'type': 'KernelUpdateHead', 'num_classes': 133, 'num_ffn_fcs': 2, 'num_heads': 8, 'num_cls_fcs': 1, 'num_mask_fcs': 1, 'feedforward_channels': 2048, 'in_channels': 256, 'out_channels': 256, 'dropout': 0.0, 'mask_thr': 0.5, 'conv_kernel_size': 1, 'mask_upsample_stride': 2, 'ffn_act_cfg': {'type': 'ReLU', 'inplace': True}, 'with_ffn': True, 'feat_transform_cfg': {'conv_cfg': {'type': 'Conv2d'}, 'act_cfg': None}, 'kernel_updator_cfg': {'type': 'KernelUpdator', 'in_channels': 256, 'feat_channels': 256, 'out_channels': 256, 'input_feat_shape': 3, 'act_cfg': {'type': 'ReLU', 'inplace': True}, 'norm_cfg': {'type': 'LN'}}, 'loss_rank': {'type': 'CrossEntropyLoss', 'use_sigmoid': False, 'loss_weight': 0.1}, 'loss_mask': {'type': 'CrossEntropyLoss', 'use_sigmoid': True, 'loss_weight': 1.0}, 'loss_dice': {'type': 'DiceLoss', 'loss_weight': 4.0}, 'loss_cls': {'type': 'FocalLoss', 'use_sigmoid': True, 'gamma': 2.0, 'alpha': 0.25, 'loss_weight': 2.0}}, {'type': 'KernelUpdateHead', 'num_classes': 133, 'num_ffn_fcs': 2, 'num_heads': 8, 'num_cls_fcs': 1, 'num_mask_fcs': 1, 'feedforward_channels': 2048, 'in_channels': 256, 'out_channels': 256, 'dropout': 0.0, 'mask_thr': 0.5, 'conv_kernel_size': 1, 'mask_upsample_stride': 2, 'ffn_act_cfg': {'type': 'ReLU', 'inplace': True}, 'with_ffn': True, 'feat_transform_cfg': {'conv_cfg': {'type': 'Conv2d'}, 'act_cfg': None}, 'kernel_updator_cfg': {'type': 'KernelUpdator', 'in_channels': 256, 'feat_channels': 256, 'out_channels': 256, 'input_feat_shape': 3, 'act_cfg': {'type': 'ReLU', 'inplace': True}, 'norm_cfg': {'type': 'LN'}}, 'loss_rank': {'type': 'CrossEntropyLoss', 'use_sigmoid': False, 'loss_weight': 0.1}, 'loss_mask': {'type': 'CrossEntropyLoss', 'use_sigmoid': True, 'loss_weight': 1.0}, 'loss_dice': {'type': 'DiceLoss', 'loss_weight': 4.0}, 'loss_cls': {'type': 'FocalLoss', 'use_sigmoid': True, 'gamma': 2.0, 'alpha': 0.25, 'loss_weight': 2.0}}, {'type': 'KernelUpdateHead', 'num_classes': 133, 'num_ffn_fcs': 2, 'num_heads': 8, 'num_cls_fcs': 1, 'num_mask_fcs': 1, 'feedforward_channels': 2048, 'in_channels': 256, 'out_channels': 256, 'dropout': 0.0, 'mask_thr': 0.5, 'conv_kernel_size': 1, 'mask_upsample_stride': 2, 'ffn_act_cfg': {'type': 'ReLU', 'inplace': True}, 'with_ffn': True, 'feat_transform_cfg': {'conv_cfg': {'type': 'Conv2d'}, 'act_cfg': None}, 'kernel_updator_cfg': {'type': 'KernelUpdator', 'in_channels': 256, 'feat_channels': 256, 'out_channels': 256, 'input_feat_shape': 3, 'act_cfg': {'type': 'ReLU', 'inplace': True}, 'norm_cfg': {'type': 'LN'}}, 'loss_rank': {'type': 'CrossEntropyLoss', 'use_sigmoid': False, 'loss_weight': 0.1}, 'loss_mask': {'type': 'CrossEntropyLoss', 'use_sigmoid': True, 'loss_weight': 1.0}, 'loss_dice': {'type': 'DiceLoss', 'loss_weight': 4.0}, 'loss_cls': {'type': 'FocalLoss', 'use_sigmoid': True, 'gamma': 2.0, 'alpha': 0.25, 'loss_weight': 2.0}}],
                  mask_out_stride=4,
                  train_cfg=None,
-                 test_cfg=None,
+                 test_cfg={'max_per_img': 100, 'mask_thr': 0.5, 'stuff_score_thr': 0.05, 'merge_stuff_thing': {'overlap_thr': 0.6, 'iou_thr': 0.5, 'stuff_max_area': 4096, 'instance_score_thr': 0.3}},
                  **kwargs):
+        # kwargs = {'pretrained': None}
+        # debug_args for debug self.init
+        # import os
+        # if os.getenv("DEBUG") is not None:
+        #     import sys, pdb
+        #     print("-------- debug_args start {}:{}".format(__file__, sys._getframe().f_lineno))
+
+        #     for debug_n in self.__init__.__code__.co_varnames:
+        #         if debug_n in ["sys", "pdb", "os", "debug_c", "debug_n", "debug_v"]:
+        #             continue
+        #         if debug_n == "self":
+        #             try:
+        #                 for debug_c in self.children():
+        #                     print(type(debug_c))
+        #             except:
+        #                 pass
+        #         else:
+        #             try:
+        #                 debug_v = eval(debug_n)
+        #                 print("{} = {}".format(debug_n, debug_v))
+        #             except:
+        #                 pass
+        #     print("-------- debug_args stop --------")
+
         assert mask_head is not None
         assert len(stage_loss_weights) == num_stages
+
         self.num_stages = num_stages
         self.stage_loss_weights = stage_loss_weights
         self.proposal_feature_channel = proposal_feature_channel
@@ -66,6 +91,7 @@ class KernelIterHead(BaseRoIHead):
             train_cfg=train_cfg,
             test_cfg=test_cfg,
             **kwargs)
+
         # train_cfg would be None when run the test.py
         if train_cfg is not None:
             for stage in range(num_stages):
@@ -94,9 +120,9 @@ class KernelIterHead(BaseRoIHead):
                 self.mask_sampler.append(
                     build_sampler(rcnn_train_cfg.sampler, context=self))
 
-    def init_weights(self):
-        for i in range(self.num_stages):
-            self.mask_head[i].init_weights()
+    # def init_weights(self):
+    #     for i in range(self.num_stages):
+    #         self.mask_head[i].init_weights()
 
     def init_mask_head(self, mask_roi_extractor, mask_head):
         """Initialize mask head and mask roi extractor.
@@ -298,23 +324,23 @@ class KernelIterHead(BaseRoIHead):
                 results.append(single_result)
         return results
 
-    def aug_test(self, features, proposal_list, img_metas, rescale=False):
-        raise NotImplementedError('SparseMask does not support `aug_test`')
+    # def aug_test(self, features, proposal_list, img_metas, rescale=False):
+    #     raise NotImplementedError('SparseMask does not support `aug_test`')
 
-    def forward_dummy(self, x, proposal_boxes, proposal_feats, img_metas):
-        """Dummy forward function when do the flops computing."""
-        all_stage_mask_results = []
-        num_imgs = len(img_metas)
-        num_proposals = proposal_feats.size(1)
-        C, H, W = x.shape[-3:]
-        mask_preds = proposal_feats.bmm(x.view(num_imgs, C, -1)).view(
-            num_imgs, num_proposals, H, W)
-        object_feats = proposal_feats
-        for stage in range(self.num_stages):
-            mask_results = self._mask_forward(stage, x, object_feats,
-                                              mask_preds, img_metas)
-            all_stage_mask_results.append(mask_results)
-        return all_stage_mask_results
+    # def forward_dummy(self, x, proposal_boxes, proposal_feats, img_metas):
+    #     """Dummy forward function when do the flops computing."""
+    #     all_stage_mask_results = []
+    #     num_imgs = len(img_metas)
+    #     num_proposals = proposal_feats.size(1)
+    #     C, H, W = x.shape[-3:]
+    #     mask_preds = proposal_feats.bmm(x.view(num_imgs, C, -1)).view(
+    #         num_imgs, num_proposals, H, W)
+    #     object_feats = proposal_feats
+    #     for stage in range(self.num_stages):
+    #         mask_results = self._mask_forward(stage, x, object_feats,
+    #                                           mask_preds, img_metas)
+    #         all_stage_mask_results.append(mask_results)
+    #     return all_stage_mask_results
 
     def get_panoptic(self, cls_scores, mask_preds, test_cfg, img_meta):
         # resize mask predictions back

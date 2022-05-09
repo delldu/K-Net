@@ -5,6 +5,7 @@ from mmdet.models.builder import NECKS
 from mmcv.cnn.bricks.transformer import build_positional_encoding
 from mmdet.utils import get_root_logger
 
+import pdb
 
 @NECKS.register_module()
 class SemanticFPNWrapper(nn.Module):
@@ -23,23 +24,23 @@ class SemanticFPNWrapper(nn.Module):
     """
 
     def __init__(self,
-                 in_channels,
-                 feat_channels,
-                 out_channels,
-                 start_level,
-                 end_level,
+                 in_channels=256,
+                 feat_channels=256,
+                 out_channels=256,
+                 start_level=0,
+                 end_level=3,
                  cat_coors=False,
-                 positional_encoding=None,
+                 positional_encoding={'type': 'SinePositionalEncoding', 'num_feats': 128, 'normalize': True},
                  cat_coors_level=3,
                  fuse_by_cat=False,
                  return_list=False,
-                 upsample_times=3,
+                 upsample_times=2,
                  with_pred=True,
-                 num_aux_convs=0,
-                 act_cfg=dict(type='ReLU', inplace=True),
-                 out_act_cfg=dict(type='ReLU'),
+                 num_aux_convs=1,
+                 act_cfg={'type': 'ReLU', 'inplace': True},
+                 out_act_cfg={'type': 'ReLU'},
                  conv_cfg=None,
-                 norm_cfg=None):
+                 norm_cfg={'type': 'GN', 'num_groups': 32, 'requires_grad': True}):
         super(SemanticFPNWrapper, self).__init__()
 
         self.in_channels = in_channels
@@ -51,27 +52,33 @@ class SemanticFPNWrapper(nn.Module):
         self.conv_cfg = conv_cfg
         self.norm_cfg = norm_cfg
         self.act_cfg = act_cfg
-        self.cat_coors = cat_coors
+        # self.cat_coors = cat_coors
         self.cat_coors_level = cat_coors_level
         self.fuse_by_cat = fuse_by_cat
-        self.return_list = return_list
-        self.upsample_times = upsample_times
+        # self.return_list = return_list
+        self.upsample_times = upsample_times # 2
         self.with_pred = with_pred
-        if positional_encoding is not None:
+        if positional_encoding is not None: # True
             self.positional_encoding = build_positional_encoding(
                 positional_encoding)
         else:
             self.positional_encoding = None
 
         self.convs_all_levels = nn.ModuleList()
+        # (Pdb) self.start_level -- 0
+        # (Pdb) self.end_level -- 3
+
         for i in range(self.start_level, self.end_level + 1):
             convs_per_level = nn.Sequential()
             if i == 0:
-                if i == self.cat_coors_level and self.cat_coors:
-                    chn = self.in_channels + 2
-                else:
-                    chn = self.in_channels
+                # if i == self.cat_coors_level and self.cat_coors: # False
+                #     chn = self.in_channels + 2
+                # else:
+                #     chn = self.in_channels
+                chn = self.in_channels
+
                 if upsample_times == self.end_level - i:
+                    # xxxx8888 ConvModule
                     one_conv = ConvModule(
                         chn,
                         self.feat_channels,
@@ -100,10 +107,11 @@ class SemanticFPNWrapper(nn.Module):
 
             for j in range(i):
                 if j == 0:
-                    if i == self.cat_coors_level and self.cat_coors:
-                        chn = self.in_channels + 2
-                    else:
-                        chn = self.in_channels
+                    # if i == self.cat_coors_level and self.cat_coors: # False
+                    #     chn = self.in_channels + 2
+                    # else:
+                    #     chn = self.in_channels
+                    chn = self.in_channels
                     one_conv = ConvModule(
                         chn,
                         self.feat_channels,
@@ -141,12 +149,12 @@ class SemanticFPNWrapper(nn.Module):
 
             self.convs_all_levels.append(convs_per_level)
 
-        if fuse_by_cat:
+        if fuse_by_cat: # False
             in_channels = self.feat_channels * len(self.convs_all_levels)
         else:
             in_channels = self.feat_channels
 
-        if self.with_pred:
+        if self.with_pred: # True
             self.conv_pred = ConvModule(
                 in_channels,
                 self.out_channels,
@@ -158,7 +166,7 @@ class SemanticFPNWrapper(nn.Module):
 
         self.num_aux_convs = num_aux_convs
         self.aux_convs = nn.ModuleList()
-        for i in range(num_aux_convs):
+        for i in range(num_aux_convs): # num_aux_convs -- 1
             self.aux_convs.append(
                 ConvModule(
                     in_channels,
@@ -191,7 +199,7 @@ class SemanticFPNWrapper(nn.Module):
         mlvl_feats = []
         for i in range(self.start_level, self.end_level + 1):
             input_p = inputs[i]
-            if i == self.cat_coors_level:
+            if i == self.cat_coors_level: # 3
                 if self.positional_encoding is not None:
                     ignore_mask = input_p.new_zeros(
                         (input_p.shape[0], input_p.shape[-2],
@@ -199,9 +207,9 @@ class SemanticFPNWrapper(nn.Module):
                         dtype=torch.bool)
                     positional_encoding = self.positional_encoding(ignore_mask)
                     input_p = input_p + positional_encoding
-                if self.cat_coors:
-                    coord_feat = self.generate_coord(input_p)
-                    input_p = torch.cat([input_p, coord_feat], 1)
+                # if self.cat_coors: # False
+                #     coord_feat = self.generate_coord(input_p)
+                #     input_p = torch.cat([input_p, coord_feat], 1)
 
             mlvl_feats.append(self.convs_all_levels[i](input_p))
 
@@ -210,18 +218,19 @@ class SemanticFPNWrapper(nn.Module):
         else:
             feature_add_all_level = sum(mlvl_feats)
 
-        if self.with_pred:
+        if self.with_pred: # True
             out = self.conv_pred(feature_add_all_level)
         else:
             out = feature_add_all_level
 
-        if self.num_aux_convs > 0:
+        if self.num_aux_convs > 0: # 1 > 0
             outs = [out]
             for conv in self.aux_convs:
                 outs.append(conv(feature_add_all_level))
             return outs
 
-        if self.return_list:
-            return [out]
-        else:
-            return out
+        # if self.return_list: # False
+        #     return [out]
+        # else:
+        #     return out
+        return out

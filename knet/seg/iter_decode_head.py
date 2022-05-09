@@ -2,6 +2,7 @@ import torch.nn as nn
 from mmseg.models.builder import HEADS, build_head
 from mmseg.models.decode_heads.decode_head import BaseDecodeHead
 
+import pdb
 
 @HEADS.register_module()
 class IterativeDecodeHead(BaseDecodeHead):
@@ -34,6 +35,7 @@ class IterativeDecodeHead(BaseDecodeHead):
 
         for head_cfg in kernel_update_head:
             self.kernel_update_head.append(build_head(head_cfg))
+        pdb.set_trace()
 
     def forward(self, inputs):
         """Forward function."""
