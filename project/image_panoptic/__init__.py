@@ -29,6 +29,7 @@ SEGMENT_MEAN = [0.485, 0.456, 0.406]
 SEGMENT_STD = [0.229, 0.224, 0.225]
 SEGMENT_TIMES = 4
 
+
 def get_model(checkpoint):
     """Create model."""
 
@@ -99,6 +100,7 @@ def image_client(name, input_files, output_dir):
         redo.set_queue_task(context)
     print(f"Created {len(image_filenames)} tasks for {name}.")
     # print(redo)
+
 
 def image_server(name, HOST="localhost", port=6379):
     # load model

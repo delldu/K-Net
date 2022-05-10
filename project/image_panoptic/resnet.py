@@ -9,18 +9,13 @@
 # ************************************************************************************/
 #
 
-import math
-import os
 import pdb  # For debug
-import sys
-
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
+from typing import List
 
 
 def conv3x3(in_planes, out_planes, stride=1, dilation=1):
-    """3x3 convolution with padding."""
     return nn.Conv2d(
         in_planes, out_planes, kernel_size=3, stride=stride, padding=dilation, dilation=dilation, bias=False
     )
@@ -63,7 +58,6 @@ class Bottleneck(nn.Module):
     expansion = 4
 
     def __init__(self, inplanes, planes, stride=1, dilation=1, downsample=None):
-        """Bottleneck block."""
         super(Bottleneck, self).__init__()
         conv1_stride = 1
         conv2_stride = stride
@@ -123,7 +117,6 @@ def make_res_layer(block, inplanes, planes, blocks, stride=1, dilation=1):
 
 class ResNet(nn.Module):
     """ResNet backbone."""
-
     arch_settings = {
         18: (BasicBlock, (2, 2, 2, 2)),
         34: (BasicBlock, (3, 4, 6, 3)),
@@ -137,6 +130,7 @@ class ResNet(nn.Module):
 
         if depth not in self.arch_settings:
             raise KeyError(f"invalid depth {depth} for resnet")
+
         assert num_stages >= 1 and num_stages <= 4
         block, stage_blocks = self.arch_settings[depth]
         stage_blocks = stage_blocks[:num_stages]
@@ -151,59 +145,45 @@ class ResNet(nn.Module):
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
 
-        self.res_layers = []
+        self.res_layers = nn.ModuleList()
         for i, num_blocks in enumerate(stage_blocks):
             stride = strides[i]
             dilation = dilations[i]
             planes = 64 * 2**i
             res_layer = make_res_layer(block, self.inplanes, planes, num_blocks, stride=stride, dilation=dilation)
             self.inplanes = planes * block.expansion
-            layer_name = f"layer{i + 1}"
-            self.add_module(layer_name, res_layer)
-            self.res_layers.append(layer_name)
+            self.res_layers.append(res_layer)
 
         self.feat_dim = block.expansion * 64 * 2 ** (len(stage_blocks) - 1)
 
-    def forward(self, x):
+    def forward(self, x) -> List[torch.Tensor]:
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
         x = self.maxpool(x)
-        outs = []
-        for i, layer_name in enumerate(self.res_layers):
-            res_layer = getattr(self, layer_name)
+
+        outs: List[torch.Tensor] = []
+        for i, res_layer in enumerate(self.res_layers):
             x = res_layer(x)
             if i in self.out_indices:
                 outs.append(x)
-        if len(outs) == 1:
-            return outs[0]
-        else:
-            return tuple(outs)
+
+        return outs
 
 
 if __name__ == "__main__":
     model = ResNet(depth=50)
-    print(model)
-
-    # model = model.cuda()
     model.eval()
 
-    input = torch.randn(1, 3, 224, 224)
+    print(model)
 
+    model = torch.jit.script(model)
+
+    input = torch.randn(1, 3, 224, 224)
     with torch.no_grad():
         output = model(input)
 
-    print(output)
-    # print(output.size())
-
-    # (Pdb) len(output) -- 4
-    # (Pdb) output[0].size()
-    # torch.Size([1, 256, 56, 56])
-    # (Pdb) output[1].size()
-    # torch.Size([1, 512, 28, 28])
-    # (Pdb) output[2].size()
-    # torch.Size([1, 1024, 14, 14])
-    # (Pdb) output[3].size()
-    # torch.Size([1, 2048, 7, 7])
+    for i in range(len(output)):
+        print(output[i].size())
 
     pdb.set_trace()

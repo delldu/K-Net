@@ -119,8 +119,6 @@ class ConvKernelHead(nn.Module):
             self.sampler = build_sampler(sampler_cfg, context=self)
         self._init_layers()
 
-        pdb.set_trace()
-
     def _init_layers(self):
         """Initialize a sparse set of proposal boxes and proposal features."""
         self.init_kernels = nn.Conv2d(

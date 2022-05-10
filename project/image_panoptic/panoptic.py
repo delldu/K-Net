@@ -20,13 +20,10 @@ import torch.nn.functional as F
 
 if __name__ == "__main__":
     model = FPN()
+    model.eval()
     print(model)
 
-    # model = model.cuda()
-    model.eval()
-
     input = torch.randn(1, 3, 224, 224)
-
     with torch.no_grad():
         output = model(input)
 
