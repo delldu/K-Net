@@ -10,7 +10,7 @@ from mmdet.utils import get_root_logger
 
 @HEADS.register_module()
 class ConvKernelHead(nn.Module):
-
+    # xxxx1111 -- rpn_head
     def __init__(self,
                  num_proposals=100,
                  in_channels=256,
@@ -118,6 +118,8 @@ class ConvKernelHead(nn.Module):
                 sampler_cfg = dict(type='MaskPseudoSampler')
             self.sampler = build_sampler(sampler_cfg, context=self)
         self._init_layers()
+
+        pdb.set_trace()
 
     def _init_layers(self):
         """Initialize a sparse set of proposal boxes and proposal features."""

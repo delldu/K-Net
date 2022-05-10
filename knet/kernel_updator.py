@@ -7,6 +7,7 @@ import pdb
 
 @TRANSFORMER_LAYER.register_module()
 class KernelUpdator(nn.Module):
+    # xxxx1111 -- kernel_update_conv
     def __init__(self,
                  in_channels=256,
                  feat_channels=256,

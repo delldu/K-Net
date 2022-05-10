@@ -47,8 +47,6 @@ class MaskSamplingResult(SamplingResult):
         else:
             self.pos_gt_labels = None
 
-        pdb.set_trace()
-
     @property
     def masks(self):
         """torch.Tensor: concatenated positive and negative boxes"""

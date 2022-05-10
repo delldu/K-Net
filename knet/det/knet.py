@@ -18,6 +18,20 @@ class KNet(TwoStageDetector):
                  thing_label_in_seg=0,
                  **kwargs):
         super(KNet, self).__init__(*args, **kwargs)
+
+        # <class 'mmdet.models.backbones.resnet.ResNet'>
+        # <class 'mmdet.models.necks.fpn.FPN'>
+        # <class 'knet.det.kernel_head.ConvKernelHead'>
+        # <class 'knet.det.kernel_iter_head.KernelIterHead'>
+
+        assert self.with_rpn, 'KNet does not support external proposals'
+        self.num_thing_classes = num_thing_classes
+        self.num_stuff_classes = num_stuff_classes
+        self.mask_assign_stride = mask_assign_stride
+        self.thing_label_in_seg = thing_label_in_seg
+        logger = get_root_logger()
+        logger.info(f'Model: \n{self}')
+
         # debug_args for debug self.init
         import os
         if os.getenv("DEBUG") is not None:
@@ -38,18 +52,6 @@ class KNet(TwoStageDetector):
                         pass
             print("-------- debug_args stop --------")
 
-        # <class 'mmdet.models.backbones.resnet.ResNet'>
-        # <class 'mmdet.models.necks.fpn.FPN'>
-        # <class 'knet.det.kernel_head.ConvKernelHead'>
-        # <class 'knet.det.kernel_iter_head.KernelIterHead'>
-
-        assert self.with_rpn, 'KNet does not support external proposals'
-        self.num_thing_classes = num_thing_classes
-        self.num_stuff_classes = num_stuff_classes
-        self.mask_assign_stride = mask_assign_stride
-        self.thing_label_in_seg = thing_label_in_seg
-        logger = get_root_logger()
-        logger.info(f'Model: \n{self}')
 
     # def forward_train(self,
     #                   img,

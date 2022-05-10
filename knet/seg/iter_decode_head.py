@@ -35,7 +35,6 @@ class IterativeDecodeHead(BaseDecodeHead):
 
         for head_cfg in kernel_update_head:
             self.kernel_update_head.append(build_head(head_cfg))
-        pdb.set_trace()
 
     def forward(self, inputs):
         """Forward function."""

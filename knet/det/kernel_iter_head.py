@@ -23,6 +23,7 @@ import pdb
 
 @HEADS.register_module()
 class KernelIterHead(BaseRoIHead):
+    # xxxx1111--roi_head
     def __init__(self,
                  num_stages=3,
                  recursive=False,

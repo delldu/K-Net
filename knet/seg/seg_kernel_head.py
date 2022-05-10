@@ -19,7 +19,6 @@ class ASPPKernelHead(ASPPHead):
 
     def __init__(self, **kwargs):
         super(ASPPKernelHead, self).__init__(**kwargs)
-        pdb.set_trace()
 
     def forward(self, inputs):
         """Forward function."""
@@ -55,7 +54,6 @@ class UPerKernelHead(UPerHead):
 
     def __init__(self, **kwargs):
         super(UPerKernelHead, self).__init__(**kwargs)
-        pdb.set_trace()
 
     def forward(self, inputs):
         """Forward function."""
@@ -117,7 +115,6 @@ class PSPKernelHead(PSPHead):
 
     def __init__(self, **kwargs):
         super(PSPKernelHead, self).__init__(**kwargs)
-        pdb.set_trace()
 
     def forward(self, inputs):
         """Forward function."""
@@ -139,7 +136,6 @@ class FCNKernelHead(FCNHead):
 
     def __init__(self, **kwargs):
         super(FCNKernelHead, self).__init__(**kwargs)
-        pdb.set_trace()
 
     def forward(self, inputs):
         """Forward function."""

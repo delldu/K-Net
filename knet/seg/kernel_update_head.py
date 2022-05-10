@@ -91,7 +91,6 @@ class KernelUpdateHead(nn.Module):
             self.mask_fcs.append(build_activation_layer(act_cfg))
 
         self.fc_mask = nn.Linear(in_channels, out_channels)
-        pdb.set_trace()
 
     def init_weights(self):
         """Use xavier initialization for all weight parameter and set
