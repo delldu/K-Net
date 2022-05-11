@@ -118,7 +118,27 @@ class ConvKernelHead(nn.Module):
                 sampler_cfg = dict(type='MaskPseudoSampler')
             self.sampler = build_sampler(sampler_cfg, context=self)
         self._init_layers()
-        # pdb.set_trace()
+        
+        # debug_args for debug self.init
+        import os
+        if os.getenv("DEBUG") is not None:
+            import sys, pdb
+            print("-------- debug_args start {}:{}".format(__file__, sys._getframe().f_lineno))
+
+            for debug_n in self.__init__.__code__.co_varnames:
+                if debug_n in ["sys", "pdb", "os", "debug_c", "debug_n", "debug_v"]:
+                    continue
+                if debug_n == "self":
+                    for debug_c in self.children():
+                        print(type(debug_c))
+                else:
+                    try:
+                        debug_v = eval(debug_n)
+                        print("{} = {}".format(debug_n, debug_v))
+                    except:
+                        pass
+            print("-------- debug_args stop --------")
+            pdb.set_trace()
 
     def _init_layers(self):
         """Initialize a sparse set of proposal boxes and proposal features."""
