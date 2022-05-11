@@ -10,17 +10,6 @@ from .mask_pseudo_sampler import MaskPseudoSampler
 import pdb
 
 
-# def __init__(self,
-#              bbox_roi_extractor=None,
-#              bbox_head=None,
-#              mask_roi_extractor=None,
-#              mask_head=None,
-#              shared_head=None,
-#              train_cfg=None,
-#              test_cfg=None,
-#              pretrained=None,
-#              init_cfg=None):
-
 @HEADS.register_module()
 class KernelIterHead(BaseRoIHead):
     # xxxx1111--roi_head

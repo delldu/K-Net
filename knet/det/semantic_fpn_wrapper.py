@@ -176,6 +176,7 @@ class SemanticFPNWrapper(nn.Module):
                     conv_cfg=self.conv_cfg,
                     act_cfg=out_act_cfg,
                     norm_cfg=self.norm_cfg))
+        pdb.set_trace()
 
     def init_weights(self):
         logger = get_root_logger()

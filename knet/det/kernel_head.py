@@ -6,7 +6,7 @@ from mmdet.core import build_assigner, build_sampler, multi_apply, reduce_mean
 from mmdet.models.builder import HEADS, build_loss, build_neck
 from mmdet.models.losses import accuracy
 from mmdet.utils import get_root_logger
-
+import pdb
 
 @HEADS.register_module()
 class ConvKernelHead(nn.Module):
@@ -118,6 +118,7 @@ class ConvKernelHead(nn.Module):
                 sampler_cfg = dict(type='MaskPseudoSampler')
             self.sampler = build_sampler(sampler_cfg, context=self)
         self._init_layers()
+        # pdb.set_trace()
 
     def _init_layers(self):
         """Initialize a sparse set of proposal boxes and proposal features."""
@@ -504,9 +505,9 @@ class ConvKernelHead(nn.Module):
         """Forward function in testing stage."""
         return self._decode_init_proposals(img, img_metas)
 
-    def forward_dummy(self, img, img_metas):
-        """Dummy forward function.
+    # def forward_dummy(self, img, img_metas):
+    #     """Dummy forward function.
 
-        Used in flops calculation.
-        """
-        return self._decode_init_proposals(img, img_metas)
+    #     Used in flops calculation.
+    #     """
+    #     return self._decode_init_proposals(img, img_metas)
