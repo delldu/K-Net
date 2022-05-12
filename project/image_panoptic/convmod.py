@@ -441,6 +441,8 @@ class FFN(nn.Module):
 
 
 class KernelUpdateHead(nn.Module):
+    '''KernelUpdateHead'''
+
     def __init__(
         self,
         num_classes=133,
@@ -577,6 +579,8 @@ class KernelUpdateHead(nn.Module):
 
 
 class KernelIterHead(nn.Module):
+    '''roi_head'''
+
     def __init__(self, num_stages=3, num_proposals=100, num_thing_classes=80, num_stuff_classes=53, **kwargs):
         super(KernelIterHead, self).__init__()
         # kwargs = {'pretrained': None}

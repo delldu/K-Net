@@ -138,7 +138,7 @@ class ConvKernelHead(nn.Module):
                     except:
                         pass
             print("-------- debug_args stop --------")
-            pdb.set_trace()
+            # pdb.set_trace()
 
     def _init_layers(self):
         """Initialize a sparse set of proposal boxes and proposal features."""
@@ -149,15 +149,15 @@ class ConvKernelHead(nn.Module):
             padding=int(self.conv_kernel_size // 2),
             bias=False)
 
-        if self.semantic_fpn:
-            if self.loss_seg.use_sigmoid:
+        if self.semantic_fpn: # True
+            if self.loss_seg.use_sigmoid: # Trues
                 self.conv_seg = nn.Conv2d(self.out_channels, self.num_classes,
                                           1)
             else:
                 self.conv_seg = nn.Conv2d(self.out_channels,
                                           self.num_classes + 1, 1)
 
-        if self.feat_downsample_stride > 1 and self.feat_refine:
+        if self.feat_downsample_stride > 1 and self.feat_refine: # False
             self.ins_downsample = ConvModule(
                 self.in_channels,
                 self.out_channels,
@@ -194,7 +194,7 @@ class ConvKernelHead(nn.Module):
     def init_weights(self):
         self.localization_fpn.init_weights()
 
-        if self.feat_downsample_stride > 1 and self.conv_normal_init:
+        if self.feat_downsample_stride > 1 and self.conv_normal_init: # True
             logger = get_root_logger()
             logger.info('Initialize convs in KPN head by normal std 0.01')
             for conv in [self.loc_convs, self.seg_convs]:
@@ -202,9 +202,9 @@ class ConvKernelHead(nn.Module):
                     if isinstance(m, nn.Conv2d):
                         normal_init(m, std=0.01)
 
-        if self.semantic_fpn:
+        if self.semantic_fpn: # True
             bias_seg = bias_init_with_prob(0.01)
-            if self.loss_seg.use_sigmoid:
+            if self.loss_seg.use_sigmoid: # True
                 normal_init(self.conv_seg, std=0.01, bias=bias_seg)
             else:
                 normal_init(self.conv_seg, mean=0, std=0.01)
@@ -217,29 +217,48 @@ class ConvKernelHead(nn.Module):
             logger.info(
                 f'Initialize kernels by normal std: {self.kernel_init_std}')
             normal_init(self.init_kernels, mean=0, std=self.kernel_init_std)
+        # pdb.set_trace()
 
     def _decode_init_proposals(self, img, img_metas):
-        num_imgs = len(img_metas)
+        num_imgs = len(img_metas) # -- 1
+        # len(img), img[0].size(), img[1].size(), img[2].size(), img[3].size()
+        # (4, [1, 256, 200, 200], [1, 256, 100, 100], [1, 256, 50, 50], [1, 256, 25, 25])
+        # img_metas
+        # [{'filename': 'images/005.png', 
+        # 'ori_filename': 'images/005.png', 
+        # 'ori_shape': (1024, 1024, 3), 
+        # 'img_shape': (800, 800, 3), 
+        # 'pad_shape': (800, 800, 3), 
+        # 'scale_factor': array([0.78125, 0.78125, 0.78125, 0.78125], dtype=float32), 
+        # 'flip': False, 'flip_direction': None, 
+        # 'img_norm_cfg': {
+        #     'mean': array([123.675, 116.28 , 103.53 ], dtype=float32), 
+        #     'std': array([58.395, 57.12 , 57.375], dtype=float32), 'to_rgb': True}, 
+        #     'batch_input_shape': (800, 800)}]
 
-        localization_feats = self.localization_fpn(img)
-        if isinstance(localization_feats, list):
+        localization_feats = self.localization_fpn(img) # SemanticFPNWrapper()
+        # (Pdb) len(localization_feats) -- 2
+        # (Pdb) localization_feats[0].size() -- [1, 256, 100, 100]
+        # (Pdb) localization_feats[1].size() -- [1, 256, 100, 100]
+
+        if isinstance(localization_feats, list): # True
             loc_feats = localization_feats[0]
         else:
             loc_feats = localization_feats
-        for conv in self.loc_convs:
+        for conv in self.loc_convs:  # self.loc_convs -- ConvModule
             loc_feats = conv(loc_feats)
-        if self.feat_downsample_stride > 1 and self.feat_refine:
+        if self.feat_downsample_stride > 1 and self.feat_refine: # False
             loc_feats = self.ins_downsample(loc_feats)
-        mask_preds = self.init_kernels(loc_feats)
+        mask_preds = self.init_kernels(loc_feats) # self.init_kernels -- Conv2d
 
-        if self.semantic_fpn:
+        if self.semantic_fpn: # True
             if isinstance(localization_feats, list):
                 semantic_feats = localization_feats[1]
             else:
                 semantic_feats = localization_feats
             for conv in self.seg_convs:
                 semantic_feats = conv(semantic_feats)
-            if self.feat_downsample_stride > 1 and self.feat_refine:
+            if self.feat_downsample_stride > 1 and self.feat_refine: # False
                 semantic_feats = self.seg_downsample(semantic_feats)
         else:
             semantic_feats = None
@@ -249,31 +268,34 @@ class ConvKernelHead(nn.Module):
         else:
             seg_preds = None
 
-        proposal_feats = self.init_kernels.weight.clone()
+        proposal_feats = self.init_kernels.weight.clone() # [100, 256, 1, 1]
         proposal_feats = proposal_feats[None].expand(num_imgs,
                                                      *proposal_feats.size())
+        # ==>  proposal_feats.size() --[1, 100, 256, 1, 1]
 
         if semantic_feats is not None:
             x_feats = semantic_feats + loc_feats
         else:
             x_feats = loc_feats
 
-        if self.proposal_feats_with_obj:
+        if self.proposal_feats_with_obj: # True
             sigmoid_masks = mask_preds.sigmoid()
             nonzero_inds = sigmoid_masks > 0.5
-            if self.use_binary:
+            if self.use_binary: # True
                 sigmoid_masks = nonzero_inds.float()
             else:
                 sigmoid_masks = nonzero_inds.float() * sigmoid_masks
             obj_feats = torch.einsum('bnhw,bchw->bnc', sigmoid_masks, x_feats)
+            # (Pdb) sigmoid_masks.size() -- [1, 100, 100, 100] 
+            # (Pdb) x_feats.size() --       [1, 256, 100, 100]
+            # (Pdb) obj_feats.size() --     [1, 100, 256]
 
         cls_scores = None
-
-        if self.proposal_feats_with_obj:
+        if self.proposal_feats_with_obj: # True
             proposal_feats = proposal_feats + obj_feats.view(
                 num_imgs, self.num_proposals, self.out_channels, 1, 1)
 
-        if self.cat_stuff_mask and not self.training:
+        if self.cat_stuff_mask and not self.training: # True
             mask_preds = torch.cat(
                 [mask_preds, seg_preds[:, self.num_thing_classes:]], dim=1)
             stuff_kernels = self.conv_seg.weight[self.
