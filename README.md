@@ -1,3 +1,4 @@
+
 # K-Net: Towards Unified Image Segmentation
 
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/k-net-towards-unified-image-segmentation/panoptic-segmentation-on-coco-test-dev)](https://paperswithcode.com/sota/panoptic-segmentation-on-coco-test-dev?p=k-net-towards-unified-image-segmentation)
@@ -148,3 +149,5 @@ PYTHONPATH='.':$PYTHONPATH mim train mmseg $CONFIG $WORK_DIR
     booktitle={NeurIPS},
 }
 ```
+install mmcv-full
+MMCV_WITH_OPS=1 pip install -e .
